@@ -19,9 +19,13 @@ int8_t validHeartRate; //indicator to show if the heart rate calculation is vali
 #define BTN_UP 32
 #define BTN_DOWN 25
 #define BTN_START 33
+#define debounceTimeout 50
+int startButtonPreviousState = HIGH;
+long int lastDebounceTime;
+
 bool isBeep = true;
 bool isStart = false;
-int btn_start = 0;
+bool initialReading = false;
 
 void setup()
 {
@@ -50,78 +54,32 @@ void setup()
   particleSensor.setPulseAmplitudeGreen(0); //Turn off Green LED
 }
 
-void loop()
-{
+void readPulse(){
   bufferLength = 100; //buffer length of 100 stores 4 seconds of samples running at 25sps
-
-Serial.println("Back to loop");
-    while(!isStart){        
-      // waiting for user to click the start button
-        btn_start = digitalRead(BTN_START);
-        if(btn_start == LOW){
-        // Start the readings
-        if(isStart == false){
-          isStart = true;
-        }else if(isStart == true){
-          //stop the readings
-          isStart = false;
-          break;
-        }
-      }
-    }
-
   //read the first 100 samples, and determine the signal range
-  for (byte i = 0 ; i < bufferLength ; i++)
-  {
-    while (particleSensor.available() == false) //do we have new data?
-      particleSensor.check(); //Check the sensor for new data
-
-    redBuffer[i] = particleSensor.getRed();
-    irBuffer[i] = particleSensor.getIR();
-    particleSensor.nextSample(); //We're finished with this sample so move to next sample
-
-    Serial.print(F("red="));
-    Serial.print(redBuffer[i], DEC);
-    Serial.print(F(", ir="));
-    Serial.println(irBuffer[i], DEC);
+  if(!initialReading){
+    for (byte i = 0 ; i < bufferLength ; i++)
+    {
+      while (particleSensor.available() == false) //do we have new data?
+        particleSensor.check(); //Check the sensor for new data
+  
+      redBuffer[i] = particleSensor.getRed();
+      irBuffer[i] = particleSensor.getIR();
+      particleSensor.nextSample(); //We're finished with this sample so move to next sample
+  
+      Serial.print(F("red="));
+      Serial.print(redBuffer[i], DEC);
+      Serial.print(F(", ir="));
+      Serial.println(irBuffer[i], DEC);
+    }
   }
+
 
   //calculate heart rate and SpO2 after first 100 samples (first 4 seconds of samples)
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
 
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
-  while (1)
-  {
-    btn_start = digitalRead(BTN_START);
-
-//    if(btn_start == LOW){
-//      // Stop the readings
-//      if(isStart == false){
-//        isStart = true;
-//      }else if(isStart == true){
-//        isStart = false;
-//        break;
-//      }
-//    }else if(btn_start == HIGH){
-//      if(isStart == false){
-//        isStart = true;
-//        break;
-//      }
-//    }
-
-    int check = 0;
-    if (btn_start == LOW) {
-      check++;
-    }
-
-    if(check % 2 == 0){
-      isStart = true;
-    } else {
-      isStart = false;
-      break;
-    }
-    
-    //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
+  //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
     for (byte i = 25; i < 100; i++)
     {
       redBuffer[i - 25] = redBuffer[i];
@@ -133,8 +91,6 @@ Serial.println("Back to loop");
     {
       while (particleSensor.available() == false) //do we have new data?
         particleSensor.check(); //Check the sensor for new data
-
-//      digitalWrite(readLED, !digitalRead(readLED)); //Blink onboard LED with every data read
 
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
@@ -161,12 +117,42 @@ Serial.println("Back to loop");
 
       if(isBeep){
         tone(BUZZER,1900);
-//        delay(500);
       }else{
         noTone(BUZZER);
       }
       isBeep = !isBeep;
+      initialReading = true;
     //After gathering 25 new samples recalculate HR and SP02
     maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+}
+
+void loop()
+{ 
+  // Read the button 
+  int startButtonPressed = digitalRead(BTN_START);
+      // Get the current time
+  long int currentTime = millis();
+  // check if button is not press
+  if(startButtonPressed==HIGH){
+    lastDebounceTime = currentTime;
+    startButtonPreviousState = HIGH;    
+  }
+
+  if((currentTime - lastDebounceTime) > debounceTimeout){
+    // Button is pressed
+    if(!isStart){
+      initialReading = false;
+      isStart = true;
+      Serial.println("Reading start!");
+    }else{
+      Serial.println("Reading stop!");
+      isStart = false;
+      noTone(BUZZER);
+      delay(1000);
+    }
+  }
+
+  if(isStart){
+    readPulse();
   }
 }
