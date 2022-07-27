@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include <Wire.h>
 #include "MAX30105.h"
 #include "spo2_algorithm.h"
@@ -13,6 +14,8 @@ int32_t spo2; //SPO2 value
 int8_t validSPO2; //indicator to show if the SPO2 calculation is valid
 int32_t heartRate; //heart rate value
 int8_t validHeartRate; //indicator to show if the heart rate calculation is valid
+int spo2Limit; // sets limit for spo2 level to beep
+int addressSpo2Limit = 0;
 
 #define BUZZER 16
 #define POTENTIOMETER 35
@@ -29,14 +32,20 @@ bool initialReading = false;
 
 void setup()
 {
-  /*
-  PROBLEMA SA PAG STOP NG READING NG SENSOR
-  */
+  
   Serial.begin(115200); // initialize serial communication at 115200 bits per second:
   pinMode(BUZZER, OUTPUT);
   pinMode(BTN_UP,INPUT_PULLUP);
   pinMode(BTN_DOWN,INPUT_PULLUP);
   pinMode(BTN_START,INPUT_PULLUP);
+
+  // Get the SPO2Limit Value
+  spo2Limit = EEPROM.read(addressSpo2Limit);
+  if(spo2Limit == 0){
+    // No value found
+    // set a default spo2limit
+    spo2Limit = 90;
+  }
 
   // Initialize sensor
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
@@ -115,15 +124,17 @@ void readPulse(){
       Serial.println(validSPO2, DEC);
     }
 
+    //After gathering 25 new samples recalculate HR and SP02
+    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+    if(spo2 <= spo2Limit){
       if(isBeep){
         tone(BUZZER,1900);
       }else{
         noTone(BUZZER);
       }
-      isBeep = !isBeep;
+      isBeep = !isBeep;     
+    }
       initialReading = true;
-    //After gathering 25 new samples recalculate HR and SP02
-    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
 }
 
 void loop()
