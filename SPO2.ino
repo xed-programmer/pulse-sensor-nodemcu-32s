@@ -9,6 +9,8 @@ MAX30105 particleSensor;
 #define SCREEN_WIDTH 128 // OLED width,  in pixels
 #define SCREEN_HEIGHT 64 // OLED height, in pixels
 
+#define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
+
 uint32_t irBuffer[100]; //infrared LED sensor data
 uint32_t redBuffer[100];  //red LED sensor data
 
@@ -29,13 +31,17 @@ Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define BTN_UP 32
 #define BTN_DOWN 25
 #define BTN_START 33
+#define BTN_MENU 26
 #define debounceTimeout 50
 int startButtonPreviousState = HIGH;
+int menuButtonPreviousState = HIGH;
 long int lastDebounceTime;
 
 bool isBeep = true;
 bool isStart = false;
 bool initialReading = false;
+int optionSelected = 0;
+String menuOption[] = {"WELCOME", "Set SPO2 Limit", "Machine Number"};
 
 void setup()
 {
@@ -45,6 +51,7 @@ void setup()
   pinMode(BTN_UP,INPUT_PULLUP);
   pinMode(BTN_DOWN,INPUT_PULLUP);
   pinMode(BTN_START,INPUT_PULLUP);
+  pinMode(BTN_MENU,INPUT_PULLUP);
 
   // Get the SPO2Limit Value
   spo2Limit = EEPROM.read(addressSpo2Limit);
@@ -85,7 +92,7 @@ void readPulse(){
       while (particleSensor.available() == false) //do we have new data?
         particleSensor.check(); //Check the sensor for new data
       
-      oledPrint(0,0,"INITIAL READING...");
+      oledPrint(0,0,"INITIAL READING...\nPlease Wait");
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample(); //We're finished with this sample so move to next sample
@@ -136,7 +143,6 @@ void readPulse(){
 
       Serial.print(F(", SPO2Valid="));
       Serial.println(validSPO2, DEC);
-
     }
 
     //After gathering 25 new samples recalculate HR and SP02
@@ -159,7 +165,7 @@ void readPulse(){
 
 void oledPrint(int x, int y, String message)
 {  
-  oled.clearDisplay();    
+  oled.clearDisplay();
   oled.setTextSize(2);         // set text size
   oled.setTextColor(WHITE);    // set text color
   oled.setCursor(x,y);
@@ -170,25 +176,63 @@ void oledPrint(int x, int y, String message)
 
 void loop()
 {
+  if(!isStart){
+    if(menuButtonPreviousState == LOW){
+      //menu is selected
+      if(optionSelected == 0){
+        // welcome
+        oledPrint(0,0,menuOption[optionSelected]);
+      }else if(optionSelected == 1){    
+        oled.clearDisplay();
+        oled.setTextSize(2);         // set text size
+        oled.setTextColor(WHITE);    // set text color
+        oled.setCursor(0,0);
+        oled.println(menuOption[optionSelected]);
+        oled.setCursor(0,1);
+        oled.println("SPO2 Level: " + spo2Limit);
+        oled.display();
+      }else if(optionSelected == 2){
+        oled.clearDisplay();
+        oled.setTextSize(2);         // set text size
+        oled.setTextColor(WHITE);    // set text color
+        oled.setCursor(0,0);
+        oled.println(menuOption[optionSelected]);
+        oled.setCursor(0,1);
+        oled.println("20190474");
+        oled.display();
+      }
+    }else{
+      oledPrint(0,0,menuOption[optionSelected]);
+    }
+  }
   // Read the button
   int startButtonPressed = digitalRead(BTN_START);
+  int menuButtonPressed = digitalRead(BTN_MENU);
   // Get the current time
   long int currentTime = millis();
   // check if button is not press
-  if(startButtonPressed==HIGH){
+  if(startButtonPressed==HIGH && menuButtonPressed==HIGH){
     lastDebounceTime = currentTime;
-    startButtonPreviousState = HIGH;    
+    startButtonPreviousState = HIGH;
+    menuButtonPreviousState = HIGH;
   }
 
   if((currentTime - lastDebounceTime) > debounceTimeout){
     // Button is pressed
-    if(!isStart){
-      initialReading = false;
-      isStart = true;      
-    }else{
+    if(startButtonPressed==LOW){
+      // START/STOP Button is pressed
+      if(!isStart){
+        initialReading = false;
+        isStart = true;
+      }else{
+        isStart = false;
+        noTone(BUZZER);
+        delay(1000);
+      }
+    }else if(menuButtonPressed==LOW){
       isStart = false;
       noTone(BUZZER);
-      delay(1000);
+      optionSelected = (optionSelected < ARRAY_SIZE(menuOption))? optionSelected + 1: 0;
     }
   }
 
