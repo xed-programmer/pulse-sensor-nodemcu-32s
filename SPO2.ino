@@ -1,9 +1,13 @@
 #include <EEPROM.h>
 #include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include "MAX30105.h"
 #include "spo2_algorithm.h"
 
 MAX30105 particleSensor;
+#define SCREEN_WIDTH 128 // OLED width,  in pixels
+#define SCREEN_HEIGHT 64 // OLED height, in pixels
 
 uint32_t irBuffer[100]; //infrared LED sensor data
 uint32_t redBuffer[100];  //red LED sensor data
@@ -16,6 +20,9 @@ int32_t heartRate; //heart rate value
 int8_t validHeartRate; //indicator to show if the heart rate calculation is valid
 int spo2Limit; // sets limit for spo2 level to beep
 int addressSpo2Limit = 0;
+
+// create an OLED display object connected to I2C
+Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 #define BUZZER 16
 #define POTENTIOMETER 35
@@ -47,16 +54,22 @@ void setup()
     spo2Limit = 90;
   }
 
+  // initialize OLED display with I2C address 0x3C
+  if (!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("failed to start SSD1306 OLED"));
+    while (1);
+  }
+
+  oled.display();
+  delay(2000); // wait two seconds for initializing
+  oled.clearDisplay();
+  
   // Initialize sensor
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
   {
     Serial.println(F("MAX30105 was not found. Please check wiring/power."));
     while (1);
   }
-
-//  Serial.println(F("Attach sensor to finger with rubber band. Press any key to start conversion"));
-//  while (Serial.available() == 0) ; //wait until user presses a key
-//  Serial.read();
   
   particleSensor.setup(); //Configure sensor with default settings
   particleSensor.setPulseAmplitudeRed(0x0A); //Turn Red LED to low to indicate sensor is running
@@ -71,7 +84,8 @@ void readPulse(){
     {
       while (particleSensor.available() == false) //do we have new data?
         particleSensor.check(); //Check the sensor for new data
-  
+      
+      oledPrint(0,0,"INITIAL READING...");
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample(); //We're finished with this sample so move to next sample
@@ -122,12 +136,18 @@ void readPulse(){
 
       Serial.print(F(", SPO2Valid="));
       Serial.println(validSPO2, DEC);
+
     }
 
     //After gathering 25 new samples recalculate HR and SP02
     maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+    // Display HR and SPO2 in OLED
+    String message = "HR=" + String(heartRate) + "\n" + "SPO2=" +String(spo2) + "%";
+    oledPrint(0,0,message);    
+
     if(spo2 <= spo2Limit){
       if(isBeep){
+        noTone(BUZZER);
         tone(BUZZER,1900);
       }else{
         noTone(BUZZER);
@@ -137,11 +157,22 @@ void readPulse(){
       initialReading = true;
 }
 
+void oledPrint(int x, int y, String message)
+{  
+  oled.clearDisplay();    
+  oled.setTextSize(2);         // set text size
+  oled.setTextColor(WHITE);    // set text color
+  oled.setCursor(x,y);
+  oled.println(message);
+  oled.display();
+  delay(1);
+}
+
 void loop()
-{ 
-  // Read the button 
+{
+  // Read the button
   int startButtonPressed = digitalRead(BTN_START);
-      // Get the current time
+  // Get the current time
   long int currentTime = millis();
   // check if button is not press
   if(startButtonPressed==HIGH){
@@ -153,10 +184,8 @@ void loop()
     // Button is pressed
     if(!isStart){
       initialReading = false;
-      isStart = true;
-      Serial.println("Reading start!");
+      isStart = true;      
     }else{
-      Serial.println("Reading stop!");
       isStart = false;
       noTone(BUZZER);
       delay(1000);
