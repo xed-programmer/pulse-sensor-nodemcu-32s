@@ -7,7 +7,7 @@
 
 MAX30105 particleSensor;
 #define SCREEN_WIDTH 128 // OLED width,  in pixels
-#define SCREEN_HEIGHT 64 // OLED height, in pixels
+#define SCREEN_HEIGHT 32 // OLED height, in pixels
 
 #define ARRAY_SIZE(x) sizeof(x)/sizeof(x[0])
 
@@ -26,6 +26,9 @@ int addressSpo2Limit = 0;
 // create an OLED display object connected to I2C
 Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+// define the number of bytes you want to access
+#define EEPROM_SIZE 1
+
 #define BUZZER 16
 #define POTENTIOMETER 35
 #define BTN_UP 32
@@ -41,12 +44,15 @@ bool isBeep = true;
 bool isStart = false;
 bool initialReading = false;
 int optionSelected = 0;
-String menuOption[] = {"WELCOME", "Set SPO2 Limit", "Machine Number"};
+String menuOption[] = {"WELCOME", "SET SPO2 LIMIT", "Machine Number"};
 
 void setup()
 {
   
   Serial.begin(115200); // initialize serial communication at 115200 bits per second:
+  // initialize EEPROM with predefined size
+  EEPROM.begin(EEPROM_SIZE);
+  
   pinMode(BUZZER, OUTPUT);
   pinMode(BTN_UP,INPUT_PULLUP);
   pinMode(BTN_DOWN,INPUT_PULLUP);
@@ -55,10 +61,11 @@ void setup()
 
   // Get the SPO2Limit Value
   spo2Limit = EEPROM.read(addressSpo2Limit);
-  if(spo2Limit == 0){
-    // No value found
+  if(spo2Limit <= 0 || spo2Limit>100){
     // set a default spo2limit
     spo2Limit = 90;
+    EEPROM.write(addressSpo2Limit, spo2Limit);
+    EEPROM.commit();
   }
 
   // initialize OLED display with I2C address 0x3C
@@ -75,7 +82,14 @@ void setup()
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
   {
     Serial.println(F("MAX30105 was not found. Please check wiring/power."));
-    while (1);
+    while (1){
+      oled.clearDisplay();
+      oled.setTextSize(1);         // set text size
+      oled.setTextColor(WHITE);    // set text color
+      oled.setCursor(0,0);
+      oled.println(F("MAX30105 was not found. Please check wiring/power."));
+      oled.display();
+    }
   }
   
   particleSensor.setup(); //Configure sensor with default settings
@@ -159,6 +173,8 @@ void readPulse(){
         noTone(BUZZER);
       }
       isBeep = !isBeep;     
+    }else{
+      noTone(BUZZER);
     }
       initialReading = true;
 }
@@ -166,7 +182,7 @@ void readPulse(){
 void oledPrint(int x, int y, String message)
 {  
   oled.clearDisplay();
-  oled.setTextSize(2);         // set text size
+  oled.setTextSize(1);         // set text size
   oled.setTextColor(WHITE);    // set text color
   oled.setCursor(x,y);
   oled.println(message);
@@ -176,51 +192,43 @@ void oledPrint(int x, int y, String message)
 
 void loop()
 {
+  // Read the button
+  int startButtonPressed = digitalRead(BTN_START);
+  int menuButtonPressed = digitalRead(BTN_MENU);
+  int upButtonPressed = digitalRead(BTN_UP);
+  int downButtonPressed = digitalRead(BTN_DOWN);
+  
   if(!isStart){
     if(menuButtonPreviousState == LOW){
       //menu is selected
       if(optionSelected == 0){
-        // welcome
+        // welcome        
         oledPrint(0,0,menuOption[optionSelected]);
-      }else if(optionSelected == 1){    
-        oled.clearDisplay();
-        oled.setTextSize(2);         // set text size
-        oled.setTextColor(WHITE);    // set text color
-        oled.setCursor(0,0);
-        oled.println(menuOption[optionSelected]);
-        oled.setCursor(0,1);
-        oled.println("SPO2 Level: " + spo2Limit);
-        oled.display();
+      }else if(optionSelected == 1){
+        String msg = menuOption[optionSelected] + "\n\tSPO2 Level:"+spo2Limit + "%";
+        oledPrint(0,0,msg);
       }else if(optionSelected == 2){
-        oled.clearDisplay();
-        oled.setTextSize(2);         // set text size
-        oled.setTextColor(WHITE);    // set text color
-        oled.setCursor(0,0);
-        oled.println(menuOption[optionSelected]);
-        oled.setCursor(0,1);
-        oled.println("20190474");
-        oled.display();
+        String msg = menuOption[optionSelected]+ "\n\t20190474";
+        oledPrint(0,0,msg);
       }
     }else{
-      oledPrint(0,0,menuOption[optionSelected]);
+      oledPrint(0,0,menuOption[0]);
     }
   }
-  // Read the button
-  int startButtonPressed = digitalRead(BTN_START);
-  int menuButtonPressed = digitalRead(BTN_MENU);
+
   // Get the current time
   long int currentTime = millis();
   // check if button is not press
-  if(startButtonPressed==HIGH && menuButtonPressed==HIGH){
+  if(startButtonPressed==HIGH && menuButtonPressed==HIGH && upButtonPressed==HIGH && downButtonPressed==HIGH){
     lastDebounceTime = currentTime;
     startButtonPreviousState = HIGH;
-    menuButtonPreviousState = HIGH;
   }
 
   if((currentTime - lastDebounceTime) > debounceTimeout){
     // Button is pressed
     if(startButtonPressed==LOW){
       // START/STOP Button is pressed
+      menuButtonPreviousState = HIGH;
       if(!isStart){
         initialReading = false;
         isStart = true;
@@ -230,9 +238,32 @@ void loop()
         delay(1000);
       }
     }else if(menuButtonPressed==LOW){
-      isStart = false;
       noTone(BUZZER);
-      optionSelected = (optionSelected < ARRAY_SIZE(menuOption))? optionSelected + 1: 0;
+      menuButtonPreviousState = LOW;
+      optionSelected = (optionSelected < ARRAY_SIZE(menuOption)-1)? optionSelected + 1: 0;
+      delay(500);
+    }else if(upButtonPressed==LOW && menuButtonPreviousState==LOW && optionSelected == 1){
+      oledPrint(0,0,"UP BUTTON PRESSED");
+      delay(500);
+      if(spo2Limit<100){
+        spo2Limit++;
+        EEPROM.write(addressSpo2Limit, spo2Limit);
+        EEPROM.commit();
+        delay(500);
+      }
+    }else if(downButtonPressed==LOW){
+      if(menuButtonPreviousState==LOW && optionSelected == 1){
+        oledPrint(0,0,"DOWN BUTTON PRESSED");
+        delay(500);
+        if(spo2Limit>90){
+          spo2Limit--;
+          EEPROM.write(addressSpo2Limit, spo2Limit);  
+          EEPROM.commit();
+          delay(500);
+        }
+      }
+    }else{
+      // Do Nothing
     }
   }
 
