@@ -38,12 +38,13 @@ int32_t heartRate; //heart rate value
 int8_t validHeartRate; //indicator to show if the heart rate calculation is valid
 int spo2Limit; // sets limit for spo2 level to beep
 int addressSpo2Limit = 0;
+int addressMachineNum = 1;
 
 // create an OLED display object connected to I2C
 Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // define the number of bytes you want to access
-#define EEPROM_SIZE 1
+#define EEPROM_SIZE 2
 
 #define BUZZER 16
 #define POTENTIOMETER 35
@@ -61,10 +62,10 @@ bool isStart = false;
 bool initialReading = false;
 int optionSelected = 0;
 String menuOption[] = {"WELCOME", "SET SPO2 LIMIT", "Machine Number"};
+char machineNumber[25];
 
 void setup()
-{
-  
+{  
   Serial.begin(115200); // initialize serial communication at 115200 bits per second:
   // initialize EEPROM with predefined size
   EEPROM.begin(EEPROM_SIZE);
@@ -83,7 +84,7 @@ void setup()
     EEPROM.write(addressSpo2Limit, spo2Limit);
     EEPROM.commit();
   }
-
+  
   // initialize OLED display with I2C address 0x3C
   if (!oled.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("failed to start SSD1306 OLED"));
@@ -124,6 +125,9 @@ void setup()
     oled.print(".");
     oled.display();
   }
+
+  // Set Machine Number
+  snprintf(machineNumber, 25, "DEVICE-%llX", ESP.getEfuseMac());
 }
 
 void readPulse(){
@@ -225,7 +229,7 @@ void sendData(String hr, String spo2){
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     
     // Prepare your HTTP POST request data
-    String httpRequestData = "api_key=" + apiKeyValue + "&id=" + 20190474 + "&hr=" + hr + "&spo2=" + spo2 + "";
+    String httpRequestData = "api_key=" + apiKeyValue + "&id=" + String(machineNumber) + "&hr=" + hr + "&spo2=" + spo2 + "";
 
     // Send HTTP POST request
     int httpResponseCode = http.POST(httpRequestData);
@@ -268,7 +272,7 @@ void loop()
         String msg = menuOption[optionSelected] + "\n\tSPO2 Level:"+spo2Limit + "%";
         oledPrint(0,0,msg);
       }else if(optionSelected == 2){
-        String msg = menuOption[optionSelected]+ "\n\t20190474";
+        String msg = menuOption[optionSelected]+ "\n\t" + String(machineNumber);
         oledPrint(0,0,msg);
       }
     }else{
