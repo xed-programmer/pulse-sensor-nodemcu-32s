@@ -1,9 +1,25 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClient.h>
+
 #include <EEPROM.h>
+
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "MAX30105.h"
 #include "spo2_algorithm.h"
+
+// Replace with your network credentials
+const char* ssid     = "CISCO";
+const char* password = "NoP@ssWorD";
+
+// REPLACE with your Domain name and URL path or IP address with path
+const String serverName = "http://10.10.10.200/protech/";
+
+// Keep this API Key value to be compatible with the PHP code provided in the project page. 
+// If you change the apiKeyValue value, the PHP file /post-esp-data.php also needs to have the same key 
+String apiKeyValue = "tPmAT5Ab3j7F9";
 
 MAX30105 particleSensor;
 #define SCREEN_WIDTH 128 // OLED width,  in pixels
@@ -95,6 +111,19 @@ void setup()
   particleSensor.setup(); //Configure sensor with default settings
   particleSensor.setPulseAmplitudeRed(0x0A); //Turn Red LED to low to indicate sensor is running
   particleSensor.setPulseAmplitudeGreen(0); //Turn off Green LED
+
+  WiFi.begin(ssid, password);
+  oled.clearDisplay();
+  oled.setTextSize(1);
+  oled.setTextColor(WHITE);
+  oled.setCursor(0,0);
+  oled.print("Connecting");
+  oled.display();
+  while(WiFi.status() != WL_CONNECTED) { 
+    delay(500);
+    oled.print(".");
+    oled.display();
+  }
 }
 
 void readPulse(){
@@ -163,7 +192,7 @@ void readPulse(){
     maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
     // Display HR and SPO2 in OLED
     String message = "HR=" + String(heartRate) + "\n" + "SPO2=" +String(spo2) + "%";
-    oledPrint(0,0,message);    
+    oledPrint(0,0,message);
 
     if(spo2 <= spo2Limit){
       if(isBeep){
@@ -177,6 +206,37 @@ void readPulse(){
       noTone(BUZZER);
     }
       initialReading = true;
+
+      // Send data to server
+    if(validSPO2 == 1 && validHeartRate == 1){
+      sendData(String(heartRate), String(spo2));
+    }
+}
+
+void sendData(String hr, String spo2){
+  if(WiFi.status()== WL_CONNECTED){
+    WiFiClient client;
+    HTTPClient http;
+    
+    // Your Domain name with URL path or IP address with path
+    http.begin(client, serverName + "app/includes/pulseData.inc.php");
+    
+    // Specify content-type header
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    
+    // Prepare your HTTP POST request data
+    String httpRequestData = "api_key=" + apiKeyValue + "&id=" + 20190474 + "&hr=" + hr + "&spo2=" + spo2 + "";
+
+    // Send HTTP POST request
+    int httpResponseCode = http.POST(httpRequestData);
+
+    // Free resources
+    http.end();
+  }
+  else {
+    Serial.println("WiFi Disconnected");
+  }
+  //Send an HTTP POST request every 30 seconds  
 }
 
 void oledPrint(int x, int y, String message)
@@ -242,9 +302,7 @@ void loop()
       menuButtonPreviousState = LOW;
       optionSelected = (optionSelected < ARRAY_SIZE(menuOption)-1)? optionSelected + 1: 0;
       delay(500);
-    }else if(upButtonPressed==LOW && menuButtonPreviousState==LOW && optionSelected == 1){
-      oledPrint(0,0,"UP BUTTON PRESSED");
-      delay(500);
+    }else if(upButtonPressed==LOW && menuButtonPreviousState==LOW && optionSelected == 1){            
       if(spo2Limit<100){
         spo2Limit++;
         EEPROM.write(addressSpo2Limit, spo2Limit);
@@ -253,8 +311,6 @@ void loop()
       }
     }else if(downButtonPressed==LOW){
       if(menuButtonPreviousState==LOW && optionSelected == 1){
-        oledPrint(0,0,"DOWN BUTTON PRESSED");
-        delay(500);
         if(spo2Limit>90){
           spo2Limit--;
           EEPROM.write(addressSpo2Limit, spo2Limit);  
