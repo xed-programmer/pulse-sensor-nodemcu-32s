@@ -9,16 +9,41 @@
 #include <Adafruit_SSD1306.h>
 #include "MAX30105.h"
 #include "spo2_algorithm.h"
-
+const unsigned char wifiLogo [] PROGMEM = {
+  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xf0, 0x0f, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xc3
+0xc3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xf0, 0x9f, 0xf9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0x38, 0x1c, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xe1, 0x87
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xf0, 0xcf, 0xf3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xd8, 0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xf1, 0x8f, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xf0, 0xf3, 0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xfe, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xfc, 0x3f, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xf0, 0xfe, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff
+0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0
+};
 // Replace with your network credentials
 const char* ssid     = "CISCO";
 const char* password = "NoP@ssWorD";
+//const char* ssid     = "PLDT_HOME_1FBB79";
+//const char* password = "pldthome";
 
 // REPLACE with your Domain name and URL path or IP address with path
-const String serverName = "http://10.10.10.200/protech/";
+//const String serverName = "http://10.10.10.200/protech/";
+//const String serverName = "http://10.10.10.200:8000/";
+const String serverName = "http://www.boomdevdlsud.com/";
 
-// Keep this API Key value to be compatible with the PHP code provided in the project page. 
-// If you change the apiKeyValue value, the PHP file /post-esp-data.php also needs to have the same key 
+// Keep this API Key value to be compatible with the PHP code provided in the project page.  
 String apiKeyValue = "tPmAT5Ab3j7F9";
 
 MAX30105 particleSensor;
@@ -47,11 +72,10 @@ Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define EEPROM_SIZE 2
 
 #define BUZZER 16
-#define POTENTIOMETER 35
-#define BTN_UP 32
-#define BTN_DOWN 25
-#define BTN_START 33
-#define BTN_MENU 26
+#define BTN_UP 25
+#define BTN_DOWN 26
+#define BTN_START 32
+#define BTN_MENU 33
 #define debounceTimeout 50
 int startButtonPreviousState = HIGH;
 int menuButtonPreviousState = HIGH;
@@ -63,6 +87,17 @@ bool initialReading = false;
 int optionSelected = 0;
 String menuOption[] = {"WELCOME", "SET SPO2 LIMIT", "Machine Number"};
 char machineNumber[25];
+
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+
+#define TRIGGER_PIN 0
+
+// wifimanager can run in a blocking mode or a non blocking mode
+// Be sure to know how to process loops with no delay() if using non blocking
+bool wm_nonblocking = false; // change to true to use non blocking
+
+WiFiManager wm; // global wm instance
+WiFiManagerParameter custom_field; // global param ( for non blocking w params )
 
 void setup()
 {  
@@ -99,35 +134,100 @@ void setup()
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
   {
     Serial.println(F("MAX30105 was not found. Please check wiring/power."));
-    while (1){
       oled.clearDisplay();
       oled.setTextSize(1);         // set text size
       oled.setTextColor(WHITE);    // set text color
       oled.setCursor(0,0);
       oled.println(F("MAX30105 was not found. Please check wiring/power."));
       oled.display();
-    }
+      delay(5000);
   }
   
   particleSensor.setup(); //Configure sensor with default settings
   particleSensor.setPulseAmplitudeRed(0x0A); //Turn Red LED to low to indicate sensor is running
   particleSensor.setPulseAmplitudeGreen(0); //Turn off Green LED
 
-  WiFi.begin(ssid, password);
-  oled.clearDisplay();
-  oled.setTextSize(1);
-  oled.setTextColor(WHITE);
-  oled.setCursor(0,0);
-  oled.print("Connecting");
-  oled.display();
-  while(WiFi.status() != WL_CONNECTED) { 
-    delay(500);
-    oled.print(".");
-    oled.display();
+//for WIFIMANAGER
+WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
+  if(wm_nonblocking) wm.setConfigPortalBlocking(false);
+
+  // add a custom input field
+  int customFieldLength = 40;
+    const char* custom_radio_str = "<br/><label for='customfieldid'>Custom Field Label</label><input type='radio' name='customfieldid' value='1' checked> One<br><input type='radio' name='customfieldid' value='2'> Two<br><input type='radio' name='customfieldid' value='3'> Three";
+  new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
+  
+  wm.addParameter(&custom_field);
+  wm.setSaveParamsCallback(saveParamCallback);
+  
+  std::vector<const char *> menu = {"wifi","info","param","sep","restart","exit"};
+  wm.setMenu(menu);
+
+  // set dark theme
+  wm.setClass("invert");
+
+  wm.setConfigPortalTimeout(30); // auto close configportal after n seconds
+
+  bool res;
+  res = wm.autoConnect("AutoConnectAP","password"); // password protected ap
+
+  if(!res) {
+    Serial.println("Failed to connect or hit timeout");
+    // ESP.restart();
+  } 
+  else {
+    //if you get here you have connected to the WiFi    
+    Serial.println("connected...yeey :)");
   }
 
   // Set Machine Number
   snprintf(machineNumber, 25, "DEVICE-%llX", ESP.getEfuseMac());
+}
+
+void checkButton(){
+  // check for button press
+  if ( digitalRead(BTN_UP) == LOW ) {
+    // poor mans debounce/press-hold, code not ideal for production
+    delay(50);
+    if( digitalRead(BTN_UP) == LOW ){
+      Serial.println("Button Pressed");
+      // still holding button for 3000 ms, reset settings, code not ideaa for production
+      delay(3000); // reset delay hold
+      if( digitalRead(BTN_UP) == LOW ){
+        Serial.println("Button Held");
+        Serial.println("Erasing Config, restarting");
+        wm.resetSettings();
+        ESP.restart();
+      }
+      
+      // start portal w delay
+      Serial.println("Starting config portal");
+      wm.setConfigPortalTimeout(120);
+      
+      if (!wm.startConfigPortal("OnDemandAP","password")) {
+        Serial.println("failed to connect or hit timeout");
+        delay(3000);
+        // ESP.restart();
+      } else {
+        //if you get here you have connected to the WiFi
+        Serial.println("connected...yeey :)");
+      }
+    }
+  }
+}
+
+
+String getParam(String name){
+  //read parameter from server, for customhmtl input
+  String value;
+  if(wm.server->hasArg(name)) {
+    value = wm.server->arg(name);
+  }
+  return value;
+}
+
+void saveParamCallback(){
+  Serial.println("[CALLBACK] saveParamCallback fired");
+  Serial.println("PARAM customfieldid = " + getParam("customfieldid"));
 }
 
 void readPulse(){
@@ -223,7 +323,8 @@ void sendData(String hr, String spo2){
     HTTPClient http;
     
     // Your Domain name with URL path or IP address with path
-    http.begin(client, serverName + "app/includes/pulseData.inc.php");
+//    http.begin(client, serverName + "app/includes/pulseData.inc.php");
+    http.begin(client, serverName + "api/pulse-data");
     
     // Specify content-type header
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -233,7 +334,7 @@ void sendData(String hr, String spo2){
 
     // Send HTTP POST request
     int httpResponseCode = http.POST(httpRequestData);
-
+    Serial.println(httpResponseCode);
     // Free resources
     http.end();
   }
@@ -256,6 +357,9 @@ void oledPrint(int x, int y, String message)
 
 void loop()
 {
+    if(wm_nonblocking) wm.process(); // avoid delays() in loop when non-blocking and other long running code  
+  checkButton();
+  // put your main code here, to run repeat
   // Read the button
   int startButtonPressed = digitalRead(BTN_START);
   int menuButtonPressed = digitalRead(BTN_MENU);
@@ -268,6 +372,7 @@ void loop()
       if(optionSelected == 0){
         // welcome        
         oledPrint(0,0,menuOption[optionSelected]);
+        
       }else if(optionSelected == 1){
         String msg = menuOption[optionSelected] + "\n\tSPO2 Level:"+spo2Limit + "%";
         oledPrint(0,0,msg);
@@ -317,7 +422,7 @@ void loop()
       if(menuButtonPreviousState==LOW && optionSelected == 1){
         if(spo2Limit>90){
           spo2Limit--;
-          EEPROM.write(addressSpo2Limit, spo2Limit);  
+          EEPROM.write(addressSpo2Limit, spo2Limit);
           EEPROM.commit();
           delay(500);
         }
