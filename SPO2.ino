@@ -9,34 +9,7 @@
 #include <Adafruit_SSD1306.h>
 #include "MAX30105.h"
 #include "spo2_algorithm.h"
-const unsigned char wifiLogo [] PROGMEM = {
-  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xf0, 0x0f, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xc3
-0xc3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xf0, 0x9f, 0xf9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0x38, 0x1c, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xe1, 0x87
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xf0, 0xcf, 0xf3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xd8, 0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xf1, 0x8f, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xf0, 0xf3, 0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xfe, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xfc, 0x3f, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xf0, 0xfe, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff
-0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0
-};
-// Replace with your network credentials
-const char* ssid     = "CISCO";
-const char* password = "NoP@ssWorD";
-//const char* ssid     = "PLDT_HOME_1FBB79";
-//const char* password = "pldthome";
+#include "logos.h"
 
 // REPLACE with your Domain name and URL path or IP address with path
 //const String serverName = "http://10.10.10.200/protech/";
@@ -78,14 +51,14 @@ Adafruit_SSD1306 oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define BTN_MENU 33
 #define debounceTimeout 50
 int startButtonPreviousState = HIGH;
-int menuButtonPreviousState = HIGH;
+int menuButtonPreviousState = LOW;
 long int lastDebounceTime;
 
 bool isBeep = true;
 bool isStart = false;
 bool initialReading = false;
 int optionSelected = 0;
-String menuOption[] = {"WELCOME", "SET SPO2 LIMIT", "Machine Number"};
+String menuOption[] = {"WELCOME", "SET SPO2 LIMIT", "Machine Number", "WIFI"};
 char machineNumber[25];
 
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
@@ -148,7 +121,7 @@ void setup()
   particleSensor.setPulseAmplitudeGreen(0); //Turn off Green LED
 
 //for WIFIMANAGER
-WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
+  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP  
   if(wm_nonblocking) wm.setConfigPortalBlocking(false);
 
   // add a custom input field
@@ -168,6 +141,7 @@ WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   wm.setConfigPortalTimeout(30); // auto close configportal after n seconds
 
   bool res;
+  // ITO YUNG IWIFI HOTSPOT PARA PALITAN ANG WIFI CREDENTIALS
   res = wm.autoConnect("AutoConnectAP","password"); // password protected ap
 
   if(!res) {
@@ -318,6 +292,8 @@ void readPulse(){
 }
 
 void sendData(String hr, String spo2){
+  // SESEND NG DATA FROM DEVICE TO WEB SERVER
+  //PAG NAKA KONEK, MAGSESEND
   if(WiFi.status()== WL_CONNECTED){
     WiFiClient client;
     HTTPClient http;
@@ -330,7 +306,7 @@ void sendData(String hr, String spo2){
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     
     // Prepare your HTTP POST request data
-    String httpRequestData = "api_key=" + apiKeyValue + "&id=" + String(machineNumber) + "&hr=" + hr + "&spo2=" + spo2 + "&spo2_limit="+spo2Limit;
+    String httpRequestData = "api_key=" + apiKeyValue + "&id=" + String(machineNumber) + "&hr=" + hr + "&spo2=" + spo2 + "&spo2_limit=" + String(spo2Limit) + "";
 
     // Send HTTP POST request
     int httpResponseCode = http.POST(httpRequestData);
@@ -357,33 +333,50 @@ void oledPrint(int x, int y, String message)
 
 void loop()
 {
-    if(wm_nonblocking) wm.process(); // avoid delays() in loop when non-blocking and other long running code  
-  checkButton();
   // put your main code here, to run repeat
   // Read the button
   int startButtonPressed = digitalRead(BTN_START);
   int menuButtonPressed = digitalRead(BTN_MENU);
   int upButtonPressed = digitalRead(BTN_UP);
   int downButtonPressed = digitalRead(BTN_DOWN);
-  
+
+  // DISPLAY NG MENU
   if(!isStart){
     if(menuButtonPreviousState == LOW){
       //menu is selected
       if(optionSelected == 0){
-        // welcome        
+        // welcome
         oledPrint(0,0,menuOption[optionSelected]);
-        
       }else if(optionSelected == 1){
+        // SET SPO2 LIMIT
         String msg = menuOption[optionSelected] + "\n\tSPO2 Level:"+spo2Limit + "%";
         oledPrint(0,0,msg);
       }else if(optionSelected == 2){
+        // DISPLAY NG MACHINE NUMBER
         String msg = menuOption[optionSelected]+ "\n\t" + String(machineNumber);
         oledPrint(0,0,msg);
+      }else if(optionSelected == 3){
+        // IIIRESET NG WIFI
+        String msg = menuOption[optionSelected];
+        oledPrint(0,0, msg);
+        oled.setCursor(0,10);
+        oled.print("PRESS UP BTN TO RESTART WIFI");
+        oled.display();
+        if(wm_nonblocking) wm.process(); // avoid delays() in loop when non-blocking and other long running code  
+        checkButton();
       }
     }else{
       oledPrint(0,0,menuOption[0]);
     }
   }
+
+  //DISPLAY NG WIFI LOGO
+  if(WiFi.status()== WL_CONNECTED){          
+    oled.drawBitmap(100,0, wifiLogo, 16, 16, WHITE);          
+  }else{
+    oled.drawBitmap(100,0, noWifiLogo, 16, 16, WHITE);
+  }
+  oled.display();
 
   // Get the current time
   long int currentTime = millis();
@@ -393,6 +386,7 @@ void loop()
     startButtonPreviousState = HIGH;
   }
 
+  // CHECK KUNG NA CLICK NA IYUNG BUTTON
   if((currentTime - lastDebounceTime) > debounceTimeout){
     // Button is pressed
     if(startButtonPressed==LOW){
@@ -411,17 +405,23 @@ void loop()
       menuButtonPreviousState = LOW;
       optionSelected = (optionSelected < ARRAY_SIZE(menuOption)-1)? optionSelected + 1: 0;
       delay(500);
+
+      
     }else if(upButtonPressed==LOW && menuButtonPreviousState==LOW && optionSelected == 1){            
+      // SPO2 LIMIIT 100
       if(spo2Limit<100){
         spo2Limit++;
+        // SAVE SPO2LIMIT SA MEMOMRY NG DEVICE
         EEPROM.write(addressSpo2Limit, spo2Limit);
         EEPROM.commit();
         delay(500);
       }
     }else if(downButtonPressed==LOW){
       if(menuButtonPreviousState==LOW && optionSelected == 1){
+        // MIN SPO2 LIMIT 90
         if(spo2Limit>90){
           spo2Limit--;
+          // SAVE SPO2LIMIT SA MEMOMRY NG DEVICE
           EEPROM.write(addressSpo2Limit, spo2Limit);
           EEPROM.commit();
           delay(500);
